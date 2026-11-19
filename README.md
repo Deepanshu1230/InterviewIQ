@@ -102,7 +102,7 @@ sequenceDiagram
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/Deepanshu1230/InterviewIQ>
 cd interview
 bun install
 ```
@@ -193,4 +193,4 @@ interview/
 
 ## Author
 
-Built by **[Your name]**. [GitHub](https://github.com/your-username) · [LinkedIn](https://linkedin.com/in/your-profile)
+Built by **[Deepanshu]**. [GitHub](https://github.com/deepanshu1230) 
