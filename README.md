@@ -1,159 +1,196 @@
-# Turborepo starter
+# InterviewIQ
 
-This Turborepo starter is maintained by the Turborepo core team.
+An AI voice interviewer that asks you about **InterviewIQ**.
 
-## Using this example
+Paste a GitHub link, and the app reads your public repositories, starts a live voice interview about them, and gives you a **score out of 10** with a summary, your strengths, and what to improve.
 
-Run the following command:
+<!-- Add a demo video or GIF here, for example: -->
+<!-- [Watch the demo](https://your-video-link) -->
 
-```sh
-npx create-turbo@latest
+## Screenshots
+
+| Home | Interview | Result |
+|---|---|---|
+| ![Home](docs/home.png) | ![Interview](docs/interview.png) | ![Result](docs/result.png) |
+
+<!-- Put your screenshots in a docs/ folder. Delete this section if you have none yet. -->
+
+## How it works
+
+1. You paste your GitHub profile link.
+2. The backend fetches your public repos from the GitHub API and builds an interviewer prompt from them.
+3. The browser connects to the Deepgram Voice Agent and the interview starts by voice. The AI asks one question at a time about your real projects and follows up on vague answers.
+4. Every turn of the conversation is saved in PostgreSQL.
+5. When the interview ends, the backend sends the transcript to an LLM, which returns a rating from 1 to 10, a summary, strengths, and weaknesses.
+6. You see the result on a shareable result page.
+
+## Architecture
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant B as Browser (React)
+    participant S as Backend (Bun + Express)
+    participant G as GitHub API
+    participant D as Deepgram Voice Agent
+    participant L as Groq LLM
+    participant P as PostgreSQL
+
+    U->>B: Paste GitHub link
+    B->>S: POST /api/v1/pre-interview
+    S->>G: Get public repos
+    S->>P: Save Interview (status Pre)
+    S-->>B: interview id
+
+    B->>S: POST /api/v1/interview/:id/start
+    S->>P: Set status InProgress
+    S-->>B: system prompt and greeting
+    B->>S: GET /api/v1/deepgram-token
+    S->>D: Create short-lived token
+    S-->>B: temporary token
+
+    loop Interview (max 5 minutes)
+        B->>D: Microphone audio (WebSocket)
+        D-->>B: AI voice and transcript events
+        B->>S: POST /api/v1/interview/:id/message
+        S->>P: Save Message
+    end
+
+    B->>S: POST /api/v1/interview/:id/finish
+    S->>P: Read all messages
+    S->>L: Score the transcript
+    L-->>S: rating, summary, strengths, weaknesses
+    S->>P: Save result (status Done)
+    S-->>B: result
+    B->>S: GET /api/v1/interview/:id
+    S-->>B: result page data
 ```
 
-## What's inside?
+**Design decisions**
 
-This Turborepo includes the following packages/apps:
+- **The voice goes straight from the browser to Deepgram** over one WebSocket, so audio never passes through the backend. This keeps the conversation fast.
+- **The Deepgram API key never reaches the browser.** The backend creates a short-lived token for each session, and the browser uses only that.
+- **The system prompt is built on the server** from the candidate's repos, then handed to the browser when the interview starts.
+- **The browser posts each transcript line to the backend**, which stores it. The scoring step reads the saved conversation, not anything the browser sends at the end.
 
-### Apps and Packages
+## Tech stack
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+| Part | Technology |
+|---|---|
+| Frontend | React, Bun, React Router, Tailwind CSS, shadcn/ui, Sonner |
+| Backend | Bun, Express, Axios, Zod |
+| Database | PostgreSQL with Prisma 7 (`@prisma/adapter-pg`) |
+| Voice | Deepgram Voice Agent (`@deepgram/agents`, `@deepgram/sdk`) |
+| Scoring | Groq (OpenAI-compatible API), `openai/gpt-oss-120b` |
+| Data source | GitHub REST API |
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Data model
 
-### Utilities
+- **Interview**: `id`, `githubMetadata` (JSON list of repos), `status` (`Pre`, `InProgress`, `Done`), `score`, `summary`, `strengths`, `weaknesses`
+- **Message**: `id`, `interviewId`, `message`, `type` (`User` or `Assistant`), `createdAt`
 
-This Turborepo has some additional tools already setup for you:
+## Getting started
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+### Prerequisites
 
-### Build
+- [Bun](https://bun.sh)
+- A PostgreSQL database (local, or a free hosted one such as Neon or Supabase)
+- A [Deepgram](https://deepgram.com) account and API key
+- A [Groq](https://console.groq.com) API key (free tier)
+- A modern browser with a microphone (Chrome or Edge recommended)
 
-To build all apps and packages, run the following command:
+### 1. Clone and install
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+git clone <your-repo-url>
+cd interview
+bun install
 ```
 
-Without global `turbo`, use your package manager:
+### 2. Set up the backend environment
 
-```sh
-cd my-turborepo
-npx turbo build
-bun exec turbo build
-bun exec turbo build
+Copy `apps/backend/.env.example` to `apps/backend/.env` and fill it in:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
+DEEPGRAM_API_KEY=
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+GITHUB_TOKEN=
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Notes:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+- `DEEPGRAM_API_KEY` must be created with the **Member** role in the Deepgram console. Keys with the default role cannot create temporary tokens, and `/deepgram-token` will fail with a 403 error.
+- `GROQ_MODEL` can be any chat model your Groq key has access to. Groq changes its model list over time, so check it with
+  `curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"`.
+- `GITHUB_TOKEN` is optional. Without it, GitHub allows 60 requests per hour. With a token (no permissions needed for public repos), the limit is much higher.
 
-```sh
-turbo build --filter=docs
+### 3. Set up the database
+
+```bash
+cd apps/backend
+bunx prisma migrate dev
+bunx prisma generate
 ```
 
-Without global `turbo`:
+### 4. Point the frontend at the backend
 
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
+The frontend reads the backend address from `BACKEND_URL` in `apps/frontend/src/lib/config.ts`. For local development it should be `http://localhost:3001`.
+
+### 5. Run
+
+In one terminal:
+
+```bash
+cd apps/backend
+bun run index.ts
 ```
 
-### Develop
+In another:
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+cd apps/frontend
+bun dev
 ```
 
-Without global `turbo`, use your package manager:
+Open the address printed by the frontend (usually `http://localhost:3000`).
 
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
+## API
+
+| Method | Route | What it does |
+|---|---|---|
+| `POST` | `/api/v1/pre-interview` | Takes a GitHub link, fetches the repos, creates an interview, returns its `id` |
+| `POST` | `/api/v1/interview/:id/start` | Builds the interviewer prompt and greeting, sets the status to `InProgress` |
+| `GET` | `/api/v1/deepgram-token` | Returns a short-lived Deepgram token for the browser |
+| `POST` | `/api/v1/interview/:id/message` | Saves one turn of the conversation |
+| `POST` | `/api/v1/interview/:id/finish` | Scores the transcript and saves the result |
+| `GET` | `/api/v1/interview/:id` | Returns an interview and its result |
+
+## Safeguards
+
+- Interviews stop automatically after **5 minutes**, which also limits voice usage costs.
+- Leaving the interview page turns off the microphone and closes the voice connection.
+- An interview cannot be scored without enough spoken answers.
+- The result page handles missing, wrong, and not-yet-scored interviews instead of showing empty data.
+- API keys live only in `.env`, which is git-ignored.
+
+## Limitations and ideas for the future
+
+- Only public repositories are used, and the prompt includes up to the 8 most recent ones.
+- No user accounts yet, so anyone with a result link can open it.
+- The interview does not end by itself when the AI finishes its questions. The user presses **End interview**.
+- Ideas: interview history per user, difficulty levels, choosing a role or topic, a downloadable PDF report, and live captions as an option.
+
+## Project structure
+
+```
+interview/
+├── apps/
+│   ├── backend/    # Bun + Express API, Prisma schema, scoring
+│   └── frontend/   # React app: home form, interview, result
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Author
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Built by **[Your name]**. [GitHub](https://github.com/your-username) · [LinkedIn](https://linkedin.com/in/your-profile)
