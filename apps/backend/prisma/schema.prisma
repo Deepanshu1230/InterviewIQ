@@ -10,8 +10,12 @@ datasource db {
 model Interview{
  id              String  @id @default(uuid())
  githubMetadata  Json
- status          InterviewStatus
+ status          InterviewStatus  @default(Pre)
  score           Int    @default(0)
+ summary        String?
+  strengths      String[]
+  weaknesses     String[]
+  createdAt      DateTime        @default(now())
  conversation    Message[]
 }
 
@@ -20,6 +24,7 @@ model Message{
     message           String
     type              Messagetype
     interviewId       String
+    createdAt   DateTime    @default(now())
     interview         Interview  @relation(fields: [interviewId],references: [id])
 
 }

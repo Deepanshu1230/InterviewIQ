@@ -609,7 +609,11 @@ export const InterviewScalarFieldEnum = {
   id: 'id',
   githubMetadata: 'githubMetadata',
   status: 'status',
-  score: 'score'
+  score: 'score',
+  summary: 'summary',
+  strengths: 'strengths',
+  weaknesses: 'weaknesses',
+  createdAt: 'createdAt'
 } as const
 
 export type InterviewScalarFieldEnum = (typeof InterviewScalarFieldEnum)[keyof typeof InterviewScalarFieldEnum]
@@ -619,7 +623,8 @@ export const MessageScalarFieldEnum = {
   id: 'id',
   message: 'message',
   type: 'type',
-  interviewId: 'interviewId'
+  interviewId: 'interviewId',
+  createdAt: 'createdAt'
 } as const
 
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
@@ -655,6 +660,14 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 
@@ -716,6 +729,20 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime[]'
+ */
+export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
     
 
 

@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Interview" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "strengths" TEXT[],
+ADD COLUMN     "summary" TEXT,
+ADD COLUMN     "weaknesses" TEXT[],
+ALTER COLUMN "status" SET DEFAULT 'Pre';
+
+-- AlterTable
+ALTER TABLE "Message" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
