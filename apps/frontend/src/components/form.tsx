@@ -4,18 +4,29 @@ import {useState} from "react";
 import { toast } from "sonner";
 import axios from "axios";
 import { BACKEND_URL } from "../lib/config";
+import { useNavigate } from "react-router";
 
 export function Form(){
 const [github,setgithub]=useState("");
+const [loading,setloading]=useState(false);
+const navigate=useNavigate();
 
  async function onSubmit(){
     if(!github){
         toast("Input first");
         return ;
     }
-    await axios.post(`${BACKEND_URL}/api/v1/pre-interview`,{
+    setloading(true);
+   const Response=await axios.post(`${BACKEND_URL}/api/v1/pre-interview`,{
             github
         });
+
+        navigate(`/interview/${Response.data.id}`);
+
+        
+
+
+
 
 }
     return  <div className="h-screen w-screen bg-white flex items-center justify-center">
@@ -27,7 +38,8 @@ const [github,setgithub]=useState("");
         </h1>
         <Input placeholder="Github" className="px-4 py-4 " onChange={e => setgithub(e.target.value)}></Input>
         <div className="flex justify-center">
-          <Button onClick={onSubmit}>Start Interview</Button>
+          <Button disabled={loading} onClick={onSubmit}>{loading ? "Starting interview..."
+           : "Start Interview"}</Button>
         </div>
         
       </div>
