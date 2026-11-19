@@ -177,7 +177,7 @@ app.post("/api/v1/interview/:id/finish", async (req, res) => {
                     ]
                 })
 
-        const parsed = JSON.parse(completion.choices[0].message.content ?? "{}");
+        const parsed = JSON.parse(completion.choices[0]?.message.content ?? "{}");
 
         const interview = await prisma.interview.update({
             where: { id: req.params.id },
